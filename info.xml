@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<extension key="org.civicoop.hilreports" type="module">
+  <file>hilreports</file>
+  <name>CiviCRM rapporten Het Inter-lokaal</name>
+  <description>CiviCRM rapporten specifiek ontwikkeld voor Het Inter-lokaal</description>
+  <license>Academic Free License 3.0</license>
+  <maintainer>
+    <author>CiviCooP</author>
+    <email>helpdesk@civicoop.org</email>
+  </maintainer>
+  <releaseDate>2013-07-03</releaseDate>
+  <version>1.0</version>
+  <develStage>beta</develStage>
+  <compatibility>
+    <ver>4.2</ver>
+  </compatibility>
+  <comments>Is in development</comments>
+  <civix>
+    <namespace>CRM/Hilreports</namespace>
+  </civix>
+</extension>
