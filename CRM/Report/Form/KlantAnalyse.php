@@ -33,7 +33,7 @@
  * $Id$
  *
  */
-
+ini_set( 'display_errors', '1' );
 require_once 'CRM/Report/Form.php';
 
 class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
@@ -51,7 +51,7 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
          */
         $apiParams = array(
             'version'   =>  3,
-            'title'     =>  'Locatie Act'
+            'title'     =>  'Locatie'
         );
         $optionValues = array();
         $optionValues[0] = '- alle ';
@@ -111,12 +111,14 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
             'plaats'            => array('title' => 'Plaats'),
             'leeftijd'		=> array('title' => 'Leeftijd'),
             'geslacht'          => array('title' => 'Geslacht') ,
+            'aantal_dossier'    => array('title' => 'Aant dossiers'),
+            'aantal_enkel'      => array('title' => 'Aant. EH'),
+            'datum_eerste'      => array('title' => 'Datum 1e contact'),
             'econ_status'	=> array('title' => 'Econ. status'),
             'burg_staat'	=> array('title' => 'Burg. staat'),
             'land_herkomst'	=> array('title' => 'Land herkomst'),
             'cult_ethn'		=> array('title' => 'Cult. ethn.'),
-            'nationaliteit'	=> array('title' => 'Nationaliteit'),
-            'datum_eerste'  	=> array('title' => 'Datum 1e contact')
+            'nationaliteit'	=> array('title' => 'Nationaliteit')
            );
         $this->beginPostProcess();
 
@@ -127,15 +129,15 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
          * period for selected locations
          */
         if (isset($this->_submitValues) && !empty($this->_submitValues)) {
-            if ( isset($this->_submitValues['periode_from'])) {
-                $periodFrom = $this->_submitValues['periode_from'];
+            if (isset($this->_submitValues['periode_from']) && !empty($this->_submitValues['periode_from'])) {
+                $periodFrom = new DateTime($this->_submitValues['periode_from']);
             } else {
-                $periodFrom = '';
+                $periodFrom = new DateTime('1900-01-01');
             }
-            if (isset($this->_submitValues['periode_tot'])) {
-                $periodTo = $this->_submitValues['periode_to'];
+            if (isset($this->_submitValues['periode_to']) && !empty($this->_submitValues['periode_to'])) {
+                $periodTo = newDateTime($this->_submitValues['period_to']);
             } else {
-                $periodTo = '';
+                $periodTo = new DateTime('2100-12-31');
             }
             if (isset($this->_submitValues['locatie_value'])) {
                 $locationValue = $this->_submitValues['locatie_value'];
@@ -143,14 +145,11 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
                 $locationValue = 0;
             }
             $contactIds = array();
-            $actContactIds = $this->retrieveActivities($periodFrom, $periodTo, $locationValue);
+            $actContacts = $this->retrieveActivities($periodFrom, $periodTo, $locationValue);
+            $caseContacts = $this->retrieveCases($periodFrom, $periodTo, $locationValue);
+            $mergedContacts = array_merge($actContacts, $caseContacts);
         }
-
-        $sql  = $this->buildQuery( true );
-
-        $rows = $graphRows = array();
-        $this->buildRows ( $sql, $rows );
-
+        $this->buildRows ($rows, $mergedContacts );
         $this->formatDisplay( $rows );
         $this->doTemplateAssignment( $rows );
         $this->endPostProcess( $rows );
@@ -261,74 +260,26 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
         }
         $this->assign( 'filters', $filters );
     }
-    function buildQuery( $applyLimit = true ) {
-
-
-        if ( $applyLimit && !CRM_Utils_Array::value( 'charts', $this->_params ) ) {
-            $this->limit( );
-        }
-        $sql = "SELECT * FROM civicrm_contact";
-        return $sql;
-    }
-    function buildRows( $sql, &$rows ) {
+    function buildRows(&$rows, $listContacts ) {
         // use this method to modify $this->_columnHeaders
         $this->modifyColumnHeaders( );
         /*
-         * temp two rows to show
+         * dedupe and level up $listContacts
          */
-        $rows = array( );
-        $row['id'] = 1;
-        $row['klantnaam'] = "Miesjel Spruit";
-        $row['adres'] = "Meester Willemstraat 34a";
-        $row['postcode'] = "1234 AB";
-        $row['plaats'] = "Nijmegen";
-        $row['leeftijd'] = "44";
-        $row['geslacht'] = "Man";
-        $row['econ_status'] = "Werkend";
-        $row['burg_staat'] = "Alleenstaand";
-        $row['land_herkomst'] = "Nederland";
-        $row['cult_ethn'] = "Nederlands";
-        $row['nationaliteit'] = "Nederlands";
-        $row['datum_eerste'] = "01-11-1999";
-        $rows[] = $row;
-        $row['id'] = 2;
-        $row['klantnaam'] = "Erik Hommel";
-        $row['adres'] = "Ambachstraat 21";
-        $row['postcode'] = "6971 BN";
-        $row['plaats'] = "Brummen";
-        $row['leeftijd'] = "50";
-        $row['geslacht'] = "Man";
-        $row['econ_status'] = "Zelfstandig";
-        $row['burg_staat'] = "Getrouwd";
-        $row['land_herkomst'] = "Nederland";
-        $row['cult_ethn'] = "Nederlands";
-        $row['nationaliteit'] = "Nederlands";
-        $row['datum_eerste'] = "01-06-2012";
-        $rows[] = $row;
-
+        $rows = array();
+        foreach ($listContacts as $key1 => $rowContacts) {
+            foreach ($rowContacts as $contactId => $rowContact) {
+                $row = $rowContact;
+                if ( !isset($rows[$contactId])) {
+                    $rows[$contactId] = $row;
+                }
+            }
+        }
     }
     function retrieveActivities($periodFrom, $periodTo, $locationValue) {
-        $actContactIds = array();
-        if (!empty($periodFrom)) {
-            $periodFrom = date('Ymd', strtotime($periodFrom));
-        }
-        if (!empty($periodTo)) {
-            $periodTo = date('Ymd', strtotime($periodTo));
-        }
-        /*
-         * retrieve activity_type_id of Enkelvoudige Hulpvraag
-         */
-        $apiParams = array(
-            'version'           =>  3,
-            'option_group_id'   =>  2,
-            'label'             =>  "Enkelvoudige Hulpvraag"
-        );
-        $actType = civicrm_api('OptionValue', 'Getsingle', $apiParams);
-        if (isset($actType['is_error']) && $actType['is_error'] == 1) {
-            CRM_Core_Error::fatal('Geen of meerdere activiteittypes Enkelvoudige Hulpvraag - KlantAnalyse niet juist!');
-        } else {
-            $actTypeId = $actType['id'];
-        }
+        $actSelectedContacts = array();
+        require_once 'CRM/Utils/HilreportsUtils.php';
+        $actTypeId = CRM_Utils_HilreportsUtils::getEnkelvoudigeHulpvraagTypeId();
         /*
          * first retrieve all activities that have the activity_type_id of Enkelvoudige
          * Hulpvraag and only save them if they are in selected time slot and with
@@ -339,14 +290,15 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
             'activity_type_id'  =>  $actTypeId
         );
         $apiActivities = civicrm_api( 'Activity', 'Get', $apiParams );
-        if (isset($apiActivities['is_error']) && $apiActivities['is_error'] == 0 ) {
+        if (isset($apiActivities['is_error']) && $apiActivities['is_error'] == 0) {
             foreach($apiActivities['values'] as $actId => $hulpVraag) {
                 /*
                  * ignore cancelled activities
                  */
-                if ($hulpVraag['status_id'] != 3 ) {
-                    if ($hulpVraag['activity_date_time'] >= $periodFrom) {
-                        if (empty($periodTo) || $hulpVraag['activity_date_time'] <= $periodTo) {
+                if ($hulpVraag['status_id'] != 3)  {
+                    $hulpVraagDate = new DateTime($hulpVraag['activity_date_time']);
+                    if ($hulpVraagDate >= $periodFrom) {
+                        if (empty($periodTo) || $hulpVraagDate <= $periodTo) {
                             /*
                              * if location was selected, retrieve custom value for activity
                              */
@@ -356,15 +308,114 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
                                     'entity_table'  =>  'Activity',
                                     'entity_id'     =>  $actId
                                 );
-                                $customValue = civicrm_api('CustomValue', 'Get', $apiParams);
+                                $apiCustomValues = civicrm_api('CustomValue', 'Get', $apiParams);
+                                if (isset($apiCustomValues['is_error']) && $apiCustomValues['is_error'] == 0) {
+                                    foreach ($apiCustomValues['values'] as $customId => $apiCustomValue) {
+                                        if (isset($apiCustomValue['latest']) && $apiCustomValue['latest'] == $locationValue) {
+                                            $actSelectedContacts[] = $this->addActivityContact($actId);
+                                        }
+                                    }
+                                }
+                            } else {
+                                $actSelectedContacts[] = $this->addActivityContact($actId);
                             }
                         }
                     }
                 }
             }
         }
-
-
-
+        return $actSelectedContacts;
+    }
+    function retrieveCases($periodFrom, $periodTo, $locationValue) {
+        $caseSelectedContacts = array();
+        $caseQry = "SELECT id, start_date FROM civicrm_case";
+        $caseDAO = CRM_Core_DAO::executeQuery($caseQry);
+        while ($caseDAO->fetch()) {
+            $caseDate = new DateTime($caseDAO->start_date);
+            if ($caseDate >= $periodFrom) {
+                if (empty($periodTo) || $caseDate <= $periodTo) {
+                    /*
+                     * if location was selected, retrieve custom value for case
+                     */
+                    if ($locationValue != 0) {
+                        $apiParams = array(
+                            'version'       =>  3,
+                            'entity_table'  =>  'Case',
+                            'entity_id'     =>  $caseDAO->id
+                        );
+                        $apiCustomValues = civicrm_api('CustomValue', 'Get', $apiParams);
+                        if (isset($apiCustomValues['is_error']) && $apiCustomValues['is_error'] == 0) {
+                            foreach ($apiCustomValues['values'] as $customId => $apiCustomValue) {
+                                if (isset($apiCustomValue['latest']) && $apiCustomValue['latest'] == $locationValue) {
+                                    $caseSelectedContacts[] = $this->addCaseContact($caseDAO->id);
+                                }
+                            }
+                        }
+                    } else {
+                        $caseSelectedContacts[] = $this->addCaseContact($caseDAO->id);
+                    }
+                }
+            }
+        }
+        return $caseSelectedContacts;
+    }
+    function addActivityContact($actId) {
+        $actContacts = array();
+        if (empty($actId)) {
+            return $actContacts;
+        }
+        /*
+         * check if there is a target for the activity
+         */
+        require_once 'CRM/Activity/BAO/ActivityTarget.php';
+        $contactIds = CRM_Activity_BAO_ActivityTarget::retrieveTargetIdsByActivityId($actId);
+        foreach($contactIds as $contactId) {
+            $actContacts[$contactId] = $this->addContactDetails($contactId);
+        }
+        return $actContacts;
+    }
+    function addCaseContact($caseId) {
+        $caseContacts = array();
+        if (empty($caseId)) {
+            return $caseContacts;
+        }
+        /*
+         * check if there is a client for the case
+         */
+        require_once 'CRM/Case/BAO/Case.php';
+        $caseContactIds = CRM_Case_BAO_Case::retrieveContactIdsByCaseId($caseId);
+        foreach($caseContactIds as $contactId) {
+            $caseContacts[$contactId] = $this->addContactDetails($contactId);
+        }
+        return $caseContacts;
+    }
+    function addContactDetails($contactId) {
+        $addedContact = array();
+        $apiParams = array(
+            'version'   =>  3,
+            'id'        =>  $contactId
+        );
+        $apiContact = civicrm_api('Contact', 'Getsingle', $apiParams);
+        if (!isset($apiContact['is_error']) || $apiContact['is_error'] == 0) {
+            $addedContact['id'] = $apiContact['id'];
+            $addedContact['display_name'] = $apiContact['display_name'];
+            $addedContact['street_address'] = $apiContact['street_address'];
+            $addedContact['city'] = $apiContact['city'];
+            $addedContact['postal_code'] = $apiContact['postal_code'];
+            $addedContact['gender'] = $apiContact['gender'];
+            require_once 'CRM/Utils/HilreportsUtils.php';
+            if (isset($apiContact['birth_date']) && !empty($apiContact['birth_date'])) {
+                $addedContact['age'] = CRM_Utils_HilreportsUtils::calculateAge( $apiContact['birth_date']);
+            }
+            $addedContact['econ_status'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Economische status');
+            $addedContact['burg_staat'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Burgerlijke staat');
+            $addedContact['land_herkomst'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Land van herkomst');
+            $addedContact['cult_ethn'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Ethnisch/culturele achtergrond');
+            $addedContact['nationaliteit'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Nationaliteit');
+            $addedContact['eerste_contact'] = CRM_Utils_HilreportsUtils::getContactFirstDate($contactId);
+            $addedContact['aantal_enkel'] = CRM_Utils_HilreportsUtils::getCountEnkelvoudigeHulpvraag($contactId);
+            $addedContact['aantal_dossier'] = CRM_Utils_HilreportsUtils::getCountCases($contactId);
+        }
+        return $addedContact;
     }
 }
