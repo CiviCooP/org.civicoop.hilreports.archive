@@ -193,7 +193,7 @@ class CRM_Utils_HilreportsUtils {
                 }
             }
         }
-        return $firstContactDate->format('Y-m-d H:i:s');
+        return $firstContactDate->format('d-m-Y');
     }
     /**
      * Static function to get number of Enkelvoudige Hulpvraag for contact
@@ -234,7 +234,7 @@ class CRM_Utils_HilreportsUtils {
         );
         $apiCaseCount = civicrm_api('Case', 'Getcount', $apiParams);
         if (!isset($apiCaseCount['is_error'])) {
-            $countCases = $apiCaseCount;
+            $countCases = (int) $apiCaseCount;
         }
         return $countCases;
     }
