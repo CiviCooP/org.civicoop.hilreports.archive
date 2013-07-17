@@ -46,6 +46,7 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
 
     function __construct() {
         $this->_autoIncludeIndexedFieldsAsOrderBys = false;
+        $this->_add2groupSupported = false;
         /*
          * retrieve option values for locatie
          */
@@ -313,7 +314,6 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
     }
     function retrieveCases($periodFrom, $periodTo, $locationValue) {
         global $rowContacts;
-        $caseSelectedContacts = array();
         $caseQry = "SELECT id, start_date FROM civicrm_case";
         $caseDAO = CRM_Core_DAO::executeQuery($caseQry);
         while ($caseDAO->fetch()) {
@@ -361,26 +361,43 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
                     'id'        =>  $contactId
                 );
                 $apiContact = civicrm_api('Contact', 'Getsingle', $apiParams);
-                if (!isset($apiContact['is_error']) || $apiContact['is_error'] == 0) {
-                    if ( !key_exists($contactId, $rowContacts)) {
-                        $rowContacts[$contactId]['id'] = $apiContact['id'];
-                        $rowContacts[$contactId]['klantnaam'] = $apiContact['display_name'];
-                        $rowContacts[$contactId]['adres'] = $apiContact['street_address'];
-                        $rowContacts[$contactId]['plaats'] = $apiContact['city'];
-                        $rowContacts[$contactId]['postcode'] = $apiContact['postal_code'];
-                        $rowContacts[$contactId]['geslacht'] = $apiContact['gender'];
-                        require_once 'CRM/Utils/HilreportsUtils.php';
-                        if (isset($apiContact['birth_date']) && !empty($apiContact['birth_date'])) {
-                            $rowContacts[$contactId]['leeftijd'] = CRM_Utils_HilreportsUtils::calculateAge( $apiContact['birth_date']);
+                $processContact = false;
+                if (isset($apiContact['contact_sub_type'])) {
+                    if (is_array($apiContact['contact_sub_type'])) {
+                        foreach ($apiContact['contact_sub_type'] as $contactSubType) {
+                            if ($contactSubType == "Klant") {
+                                $processContact = true;
+                            }
                         }
-                        $rowContacts[$contactId]['econ_status'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Economische status');
-                        $rowContacts[$contactId]['burg_staat'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Burgerlijke staat');
-                        $rowContacts[$contactId]['land_herkomst'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Land van herkomst');
-                        $rowContacts[$contactId]['cult_ethn'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Ethnisch/culturele achtergrond');
-                        $rowContacts[$contactId]['nationaliteit'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Nationaliteit');
-                        $rowContacts[$contactId]['datum_eerste'] = CRM_Utils_HilreportsUtils::getContactFirstDate($contactId);
-                        $rowContacts[$contactId]['aantal_enkel'] = (int) CRM_Utils_HilreportsUtils::getCountEnkelvoudigeHulpvraag($contactId);
-                        $rowContacts[$contactId]['aantal_dossier'] = (int) CRM_Utils_HilreportsUtils::getCountCases($contactId);
+
+                    } else {
+                        if ($apiContact['contact_sub_type'] == "Klant") {
+                            $processContact = true;
+                        }
+                    }
+                }
+                if ($processContact) {
+                    if (!isset($apiContact['is_error']) || $apiContact['is_error'] == 0) {
+                        if ( !key_exists($contactId, $rowContacts)) {
+                            $rowContacts[$contactId]['id'] = $apiContact['id'];
+                            $rowContacts[$contactId]['klantnaam'] = $apiContact['display_name'];
+                            $rowContacts[$contactId]['adres'] = $apiContact['street_address'];
+                            $rowContacts[$contactId]['plaats'] = $apiContact['city'];
+                            $rowContacts[$contactId]['postcode'] = $apiContact['postal_code'];
+                            $rowContacts[$contactId]['geslacht'] = $apiContact['gender'];
+                            require_once 'CRM/Utils/HilreportsUtils.php';
+                            if (isset($apiContact['birth_date']) && !empty($apiContact['birth_date'])) {
+                                $rowContacts[$contactId]['leeftijd'] = CRM_Utils_HilreportsUtils::calculateAge( $apiContact['birth_date']);
+                            }
+                            $rowContacts[$contactId]['econ_status'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Economische status');
+                            $rowContacts[$contactId]['burg_staat'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Burgerlijke staat');
+                            $rowContacts[$contactId]['land_herkomst'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Land van herkomst');
+                            $rowContacts[$contactId]['cult_ethn'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Ethnisch/culturele achtergrond');
+                            $rowContacts[$contactId]['nationaliteit'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Nationaliteit');
+                            $rowContacts[$contactId]['datum_eerste'] = CRM_Utils_HilreportsUtils::getContactFirstDate($contactId);
+                            $rowContacts[$contactId]['aantal_enkel'] = (int) CRM_Utils_HilreportsUtils::getCountEnkelvoudigeHulpvraag($contactId);
+                            $rowContacts[$contactId]['aantal_dossier'] = (int) CRM_Utils_HilreportsUtils::getCountCases($contactId);
+                        }
                     }
                 }
             }

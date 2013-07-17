@@ -238,4 +238,10 @@ class CRM_Utils_HilreportsUtils {
         }
         return $countCases;
     }
+    /**
+     * Static function to calculate a percentage
+     */
+    static function calculatePercentage($aantal, $totaal) {
+        return round(($aantal / $totaal) * 100,1);
+    }
 }
