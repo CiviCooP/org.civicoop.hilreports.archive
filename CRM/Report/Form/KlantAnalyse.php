@@ -33,6 +33,7 @@
  * $Id$
  *
  */
+set_time_limit(0);
 ini_set( 'display_errors', '1' );
 require_once 'CRM/Report/Form.php';
 
@@ -231,9 +232,9 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
 
                 case CRM_Report_FORM::OP_DATE :
                     // build datetime fields
-                    $this->addDate( $fieldName.'_from','Van:', $required,array( 'formatType' => $dateFormat ) );
+                    $this->addDate( $fieldName.'_from','Van:', false, array( 'formatType' => $dateFormat ) );
                     $count++;
-                    $this->addDate( $fieldName.'_to','Tot:', $required,array( 'formatType' => $dateFormat ) );
+                    $this->addDate( $fieldName.'_to','Tot:', false, array( 'formatType' => $dateFormat ) );
                     $count++;
                     break;
 

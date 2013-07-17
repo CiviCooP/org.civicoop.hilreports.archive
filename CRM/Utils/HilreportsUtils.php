@@ -141,7 +141,7 @@ class CRM_Utils_HilreportsUtils {
             'label'             =>  "Enkelvoudige Hulpvraag"
         );
         $actType = civicrm_api('OptionValue', 'Getsingle', $apiParams);
-        if (isset($actType['is_error']) || $actType['is_error'] == 0) {
+        if (!isset($actType['is_error']) || $actType['is_error'] == 0) {
             $actTypeId = $actType['value'];
         }
         return $actTypeId;
