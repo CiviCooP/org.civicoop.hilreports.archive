@@ -101,9 +101,11 @@ class CRM_Utils_HilreportsUtils {
                                         case "CheckBox":
                                             $apiParams = array(
                                                 'version'           =>  3,
-                                                'option_group_id'   =>  $apiCustomField['option_group_id'],
-                                                'value'             =>  $customValue['latest'][0]
+                                                'option_group_id'   =>  $apiCustomField['option_group_id']
                                             );
+                                            if (isset($customValue['latest'][0])) {
+                                                $apiParams['value'] = $customValue['latest'][0];
+                                            }
                                             $apiOptionValues = civicrm_api('OptionValue', 'Getsingle', $apiParams);
                                             if (!isset($apiOptionValues['is_error']) || $apiOptionValues['is_error'] == 0 ) {
                                                 if (isset($apiOptionValues['label'])) {
@@ -243,5 +245,42 @@ class CRM_Utils_HilreportsUtils {
      */
     static function calculatePercentage($aantal, $totaal) {
         return round(($aantal / $totaal) * 100,1);
+    }
+    /**
+     * Static function to check if case has activities in period
+     * @author Erik Hommel (erik.hommel@civicoop.org)
+     * @param $caseId, $periodFrom, $periodTo
+     * @return boolean $activityInCase
+     */
+    static function checkActivityInCase($caseId, $periodFrom, $periodTo) {
+        $activityInCase = false;
+        if (empty($caseId)) {
+            return $activityInCase;
+        }
+        $apiParams = array(
+            'version'   =>  3,
+            'case_id'   =>  $caseId
+        );
+        $apiCase = civicrm_api('Case', 'Getsingle', $apiParams);
+        if (!isset($apiCase['is_error']) || $apiCase['is_error'] == 0) {
+            if (isset($apiCase['activities']) && !empty($apiCase['activities'])) {
+                foreach($apiCase['activities'] as $activityId) {
+                    $apiParams = array(
+                        'version'   =>  3,
+                        'id'        =>  $activityId
+                    );
+                    $apiActivity = civicrm_api('Activity', 'Getsingle', $apiParams);
+                    if (!isset($apiActivity['is_error']) || $apiActivity['is_error'] == 0) {
+                        if (isset($apiActivity['activity_date_time'])) {
+                            $actDate = new DateTime($apiActivity['activity_date_time']);
+                            if ($actDate >= $periodFrom && $actDate <= $periodTo) {
+                                $activityInCase = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return $activityInCase;
     }
 }

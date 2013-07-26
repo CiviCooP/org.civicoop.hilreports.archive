@@ -354,32 +354,41 @@ class CRM_Report_Form_PercentAnalyse extends CRM_Report_Form {
         }
     }
     function retrieveCases($periodFrom, $periodTo, $locationValue) {
-        $caseQry = "SELECT id, start_date FROM civicrm_case";
+        global $rowContacts;
+        require_once 'CRM/Utils/HilreportsUtils.php';
+        $caseQry = "SELECT id FROM civicrm_case";
         $caseDAO = CRM_Core_DAO::executeQuery($caseQry);
         while ($caseDAO->fetch()) {
-            $caseDate = new DateTime($caseDAO->start_date);
-            if ($caseDate >= $periodFrom) {
-                if (empty($periodTo) || $caseDate <= $periodTo) {
-                    /*
-                     * if location was selected, retrieve custom value for case
-                     */
-                    if ($locationValue != 0) {
-                        $apiParams = array(
-                            'version'       =>  3,
-                            'entity_table'  =>  'Case',
-                            'entity_id'     =>  $caseDAO->id
-                        );
-                        $apiCustomValues = civicrm_api('CustomValue', 'Get', $apiParams);
-                        if (isset($apiCustomValues['is_error']) && $apiCustomValues['is_error'] == 0) {
-                            foreach ($apiCustomValues['values'] as $customId => $apiCustomValue) {
-                                if (isset($apiCustomValue['latest']) && $apiCustomValue['latest'] == $locationValue) {
-                                    $this->addRowContact($caseDAO->id, "Case");
-                                }
+            /*
+             * if location was selected, retrieve custom value for case
+             */
+            if ($locationValue != 0) {
+                $apiParams = array(
+                    'version'       =>  3,
+                    'entity_table'  =>  'Case',
+                    'entity_id'     =>  $caseDAO->id
+                );
+                $apiCustomValues = civicrm_api('CustomValue', 'Get', $apiParams);
+                if (isset($apiCustomValues['is_error']) && $apiCustomValues['is_error'] == 0) {
+                    foreach ($apiCustomValues['values'] as $customId => $apiCustomValue) {
+                        if (isset($apiCustomValue['latest']) && $apiCustomValue['latest'] == $locationValue) {
+                            /*
+                             * check if activity in period for case
+                             */
+                            $activityInPeriod = CRM_Utils_HilreportsUtils::checkActivityInCase($caseDAO->id, $periodFrom, $periodTo);
+                            if ($activityInPeriod) {
+                                $this->addRowContact($caseDAO->id, "Case");
                             }
                         }
-                    } else {
-                        $this->addRowContact($caseDAO->id, "Case");
                     }
+                }
+            } else {
+                /*
+                 * check if activity in period for case
+                 */
+                $activityInPeriod = CRM_Utils_HilreportsUtils::checkActivityInCase($caseDAO->id, $periodFrom, $periodTo);
+                if ($activityInPeriod) {
+                    $this->addRowContact($caseDAO->id, "Case");
                 }
             }
         }
