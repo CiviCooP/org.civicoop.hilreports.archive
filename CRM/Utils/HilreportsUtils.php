@@ -267,6 +267,7 @@ class CRM_Utils_HilreportsUtils {
                 foreach($apiCase['activities'] as $activityId) {
                     $apiParams = array(
                         'version'   =>  3,
+                        'status_id' =>  2,
                         'id'        =>  $activityId
                     );
                     $apiActivity = civicrm_api('Activity', 'Getsingle', $apiParams);
