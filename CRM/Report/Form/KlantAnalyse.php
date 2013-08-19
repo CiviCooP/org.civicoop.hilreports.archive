@@ -34,7 +34,6 @@
  *
  */
 set_time_limit(0);
-ini_set( 'display_errors', '1' );
 require_once 'CRM/Report/Form.php';
 
 class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {

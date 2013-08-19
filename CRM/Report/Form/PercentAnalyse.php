@@ -33,7 +33,7 @@
  * $Id$
  *
  */
-ini_set( 'display_errors', '1' );
+set_time_limit(0);
 require_once 'CRM/Report/Form.php';
 
 class CRM_Report_Form_PercentAnalyse extends CRM_Report_Form {
@@ -234,9 +234,10 @@ class CRM_Report_Form_PercentAnalyse extends CRM_Report_Form {
 
                 case CRM_Report_FORM::OP_DATE :
                     // build datetime fields
-                    $this->addDate( $fieldName.'_from','Van:', $required,array( 'formatType' => $dateFormat ) );
+                    // build datetime fields
+                    $this->addDate( $fieldName.'_from','Van:', false, array( 'formatType' => 'searchDate' ) );
                     $count++;
-                    $this->addDate( $fieldName.'_to','Tot:', $required,array( 'formatType' => $dateFormat ) );
+                    $this->addDate( $fieldName.'_to','Tot:', false, array( 'formatType' => 'searchDate' ) );
                     $count++;
                     break;
 
