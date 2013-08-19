@@ -470,9 +470,9 @@ class CRM_Report_Form_PercentAnalyse extends CRM_Report_Form {
                             $fieldsSelected[] = "nationaliteit = '$nationaliteit'";
                             $datumEerste = CRM_Utils_HilreportsUtils::getContactFirstDate($contactId);
                             $fieldsSelected[] = "datum_eerste = '$datumEerste'";
-                            $aantalEnkel = (int) CRM_Utils_HilreportsUtils::getCountEnkelvoudigeHulpvraag($contactId);
+                            $aantalEnkel = CRM_Utils_HilreportsUtils::getCountEnkelvoudigeHulpvraag($contactId);
                             $fieldsSelected[] = "aantal_enkel = $aantalEnkel";
-                            $aantalDossier = (int) CRM_Utils_HilreportsUtils::getCountCases($contactId);
+                            $aantalDossier = CRM_Utils_HilreportsUtils::getCountCases($contactId);
                             $fieldsSelected[] = "aantal_dossier = $aantalDossier";
                             $insertContact = "INSERT INTO selected_contacts SET ".implode(", ", $fieldsSelected);
                             CRM_Core_DAO::executeQuery($insertContact);

@@ -47,6 +47,7 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
     function __construct() {
         $this->_autoIncludeIndexedFieldsAsOrderBys = false;
         $this->_add2groupSupported = false;
+        $this->_subtotal = false;
         /*
          * retrieve option values for locatie
          */
@@ -403,8 +404,8 @@ class CRM_Report_Form_KlantAnalyse extends CRM_Report_Form {
                             $rowContacts[$contactId]['cult_ethn'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Ethnisch/culturele achtergrond');
                             $rowContacts[$contactId]['nationaliteit'] = CRM_Utils_HilreportsUtils::getSingleCustomValue($contactId, 'Nationaliteit');
                             $rowContacts[$contactId]['datum_eerste'] = CRM_Utils_HilreportsUtils::getContactFirstDate($contactId);
-                            $rowContacts[$contactId]['aantal_enkel'] = (int) CRM_Utils_HilreportsUtils::getCountEnkelvoudigeHulpvraag($contactId);
-                            $rowContacts[$contactId]['aantal_dossier'] = (int) CRM_Utils_HilreportsUtils::getCountCases($contactId);
+                            $rowContacts[$contactId]['aantal_enkel'] = CRM_Utils_HilreportsUtils::getCountEnkelvoudigeHulpvraag($contactId);
+                            $rowContacts[$contactId]['aantal_dossier'] = CRM_Utils_HilreportsUtils::getCountCases($contactId);
                         }
                     }
                 }
