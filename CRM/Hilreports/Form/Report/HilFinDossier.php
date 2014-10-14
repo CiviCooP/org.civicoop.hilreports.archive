@@ -25,6 +25,10 @@
  | GNU Affero General Public License or the licensing of CiviCRM,     |
  | see the CiviCRM license FAQ at http://civicrm.org/licensing        |
  +--------------------------------------------------------------------+
+ | Customized and enhanced for Het Inter-lokaal                       |
+ | CiviCooP <http://www.civicoop.org>                                 |
+ | Erik Hommel <erik.hommel@civicoop.org>                             |
+ +--------------------------------------------------------------------+
 */
 
 /**
@@ -35,30 +39,32 @@
  *
  */
 class CRM_Hilreports_Form_Report_HilFinDossier extends CRM_Report_Form {
-
   protected $_relField = FALSE;
-
   protected $_addressField = FALSE;
-
   protected $_emailField = FALSE;
-
   protected $_phoneField = FALSE;
-
   protected $_worldRegionField = FALSE;
-
   protected $_activityLast = FALSE;
-
   protected $_activityLastCompleted = FALSE;
-
   protected $_includeCaseDetailExtra = FALSE;
-
-  protected $_caseDetailExtra = array(
-    );
+  protected $_caseDetailExtra = array();
+  /*
+   * specific for Het Inter-lokaal (hil)
+   */
+  protected $_hilCaseType = NULL;
+  protected $_hilCaseTypeId = NULL;
+  protected $_hilExtraGegevensName = NULL;
+  protected $_hilExtraGegevensGroupId = NULL;
+  protected $_hilEconomischeStatusName = NULL;
+  protected $_hilEconomischeStatusGroupId = NULL;
+  protected $_hilCheckInkomenGroupId = NULL;
+  protected $_hilCheckInkomenName = NULL;
 
   function __construct() {
+    $this->setHilConfigDefaults();
     $this->case_statuses = CRM_Case_PseudoConstant::caseStatus();
-    $this->case_types    = CRM_Case_PseudoConstant::caseType();
-    $rels                = CRM_Core_PseudoConstant::relationshipType();
+    $this->case_types = CRM_Case_PseudoConstant::caseType();
+    $rels = CRM_Core_PseudoConstant::relationshipType();
     foreach ($rels as $relid => $v) {
       $this->rel_types[$relid] = $v['label_b_a'];
     }
@@ -87,8 +93,7 @@ class CRM_Hilreports_Form_Report_HilFinDossier extends CRM_Report_Form {
           'end_date' => array('title' => ts('End Date'),
             'type' => CRM_Utils_Type::T_DATE,
           ),
-          'status_id' => array('title' => ts('Case Status')),
-          'case_type_id' => array('title' => ts('Case Type')),
+          'status_id' => array('title' => 'Dossierstatus'),
         ),
         'filters' =>
         array(
@@ -100,13 +105,9 @@ class CRM_Hilreports_Form_Report_HilFinDossier extends CRM_Report_Form {
             'operatorType' => CRM_Report_Form::OP_DATE,
             'type' => CRM_Utils_Type::T_DATE,
           ),
-          'status_id' => array('title' => ts('Case Status'),
+          'status_id' => array('title' => ts('Dossierstatus'),
             'operatorType' => CRM_Report_Form::OP_MULTISELECT,
             'options' => $this->case_statuses,
-          ),
-          'case_type_id' => array('title' => ts('Case Type'),
-            'operatorType' => CRM_Report_Form::OP_MULTISELECT,
-            'options' => $this->case_types,
           ),
         ),
       ),
@@ -645,5 +646,74 @@ class CRM_Hilreports_Form_Report_HilFinDossier extends CRM_Report_Form {
       }
     }
   }
+  /**
+   * Function to set default config options for Het Inter-lokaal
+   * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+   * @access private
+   */
+  private function setHilConfigDefaults() {
+    $this->_hilCaseType = 'FinDienstverlening';
+    $this->_hilCaseTypeId = $this->setHilCaseTypeId($this->_hilCaseType);
+    $this->_hilExtraGegevensName = 'Extra_gegevens';
+    $this->_hilExtraGegevensGroupId = $this->getCustomGroupId($this->hilExtraGegevensName);
+    $this->_hilEconomischeStatusName = 'Economische_status';
+    $this->_hilEconomischeStatusGroupId = $this->getCustomGroupId($this->_hilEconomischeStatusName);
+    $this->_hilCheckInkomenName = 'Check_inkomensrechten';
+    $this->_hilCheckInkomenGroupId = $this->getCustomGroupId($this->_hilCheckInkomenName);
+  }
+  /**
+   * Function to set custom group id for incoming name
+   * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+   * @param string $customGroupName
+   * @return int $customGroupId
+   * @throws Exception when no Custom Group for name found
+   * @access private
+   */
+  private function getCustomGroupId($customGroupName) {
+    if (empty($customGroupName)) {
+      $customGroupId = 0;
+    } else {
+      $customGroupParams = ['name' => $customGroupName, 'return' => 'id'];
+      try {
+        $customGroupId = civicrm_api3('CustomGroup', 'Getvalue', $customGroupParams);
+      } catch (CiviCRM_API3_Exception $ex) {
+        throw new Exception('Could not find a custom group with name '.$customGroupName.
+          ', error from API CustomGroup Getvalue: '.$ex->getMessage());
+      }
+    }
+    return $customGroupId;
+  }
+  /**
+   * Function to set case type id for incoming name
+   * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+   * @param string $caseTypeName
+   * @return int $caseTypeId
+   * @access private
+   * @throws Exception when no Option Group case_type found
+   * @throws Exception when no Case Type Id for name found
+   */
+  private function setHilCaseTypeId($caseTypeName) {
+    if (empty($caseTypeName)) {
+      $caseTypeId = 0;
+    } else {
+      $optionGroupParams = ['name' => 'case_type', 'return' => 'id'];
+      try {
+        $caseTypeOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', $optionGroupParams);
+      } catch (CiviCRM_API3_Exception $ex) {
+        throw new Exception('Could not find an option group with name case_type, '
+          . 'error from API OptionGroup Getvalue : '.$ex->getMessage());
+      }
+      $optionValueParams = [
+        'option_group_id' => $caseTypeOptionGroupId, 
+        'label' => $caseTypeName, 
+        'return' => 'value'];
+      try {
+        $caseTypeId = civicrm_api3('OptionValue', 'Getvalue', $optionValueParams);
+      } catch (CiviCRM_API3_Exception $ex) {
+        throw new Exception('Could not find a valid case type with name '.
+          $caseTypeName.', error from API OptionValue Getvalue : '.$ex->getMessage());
+      }      
+    }
+    return $caseTypeId;
+  }
 }
-
