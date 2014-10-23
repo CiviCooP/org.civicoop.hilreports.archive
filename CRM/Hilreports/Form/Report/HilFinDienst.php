@@ -49,12 +49,19 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
   protected $_hilCaseTypeId = NULL;
   protected $_hilExtraGegevensName = NULL;
   protected $_hilExtraGegevensGroupId = NULL;
-  protected $_hilEconomischeStatusName = NULL;
-  protected $_hilEconomischeStatusGroupId = NULL;
+  protected $_hilExtraGegevensTable = NULL;
+  protected $_hilExtraGegevensColumns = array();
   protected $_hilCheckInkomenGroupId = NULL;
   protected $_hilCheckInkomenName = NULL;
+  protected $_hilCheckInkomenTable = NULL;
+  protected $_hilCheckInkomenColumns = array();
+  protected $_hilAangemeldCaseStatusId = NULL;
+  protected $_hilLopendCaseStatusId = NULL;
+  protected $_hilOpenCaseActivityTypeId = NULL;
+  protected $_hilChangeStatusSubject = NULL;
 
   function __construct() {
+    $this->_add2groupSupported = FALSE;
     $this->setHilConfigDefaults();
 
     $this->case_statuses = CRM_Case_PseudoConstant::caseStatus();
@@ -82,6 +89,8 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
             'no_display' => TRUE,
             'required' => TRUE,
           ),
+          'gender_id' =>
+          array('name' => 'gender_id', 'title' => ts('Gender'), 'required' => TRUE)
         ),
       ),
       'civicrm_case' =>
@@ -212,17 +221,6 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
     $this->_select = "SELECT " . implode(', ', $select) . " ";
   }
 
-  static function formRule($fields, $files, $self) {
-    $errors = $grouping = array();
-    if (empty($fields['relationship_type_id_value']) && (array_key_exists('sort_name', $fields['fields']) || array_key_exists('label_b_a', $fields['fields']))) {
-      $errors['fields'] = ts('Either filter on at least one relationship type, or de-select Staff Member and Relationship from the list of fields.');
-    }
-    if ((!empty($fields['relationship_type_id_value']) || !empty($fields['sort_name_value'])) && (!array_key_exists('sort_name', $fields['fields']) || !array_key_exists('label_b_a', $fields['fields']))) {
-      $errors['fields'] = ts('To filter on Staff Member or Relationship, please also select Staff Member and Relationship from the list of fields.');
-    }
-    return $errors;
-  }
-
   function from() {
 
     $cc  = $this->_aliases['civicrm_case'];
@@ -270,13 +268,6 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
           else {
 
             $op = CRM_Utils_Array::value("{$fieldName}_op", $this->_params);
-            if ($fieldName == 'case_type_id') {
-              $value = CRM_Utils_Array::value("{$fieldName}_value", $this->_params);
-              if (!empty($value)) {
-                $clause = "( {$field['dbAlias']} REGEXP '[[:<:]]" . implode('[[:>:]]|[[:<:]]', $value) . "[[:>:]]' )";
-              }
-              $op = NULL;
-            }
 
             if ($op) {
               $clause = $this->whereClause($field,
@@ -290,6 +281,9 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
 
           if (!empty($clause)) {
             $clauses[] = $clause;
+            $clauses[] = "(case_civireport.case_type_id LIKE CONCAT ('%".
+              CRM_Core_DAO::VALUE_SEPARATOR."',".$this->_hilCaseTypeId.",'".
+              CRM_Core_DAO::VALUE_SEPARATOR ."%'))";
           }
         }
       }
@@ -314,7 +308,10 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     $sql = $this->buildQuery(TRUE);
 
     $rows = $graphRows = array();
+    
     $this->buildRows($sql, $rows);
+    
+    $this->hilEnhanceRows($rows);
 
     $this->formatDisplay($rows);
     $this->doTemplateAssignment($rows);
@@ -329,21 +326,6 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
           $rows[$rowNum]['civicrm_case_status_id'] = $this->case_statuses[$value];
           $entryFound = TRUE;
         }
-      }
-
-      if (array_key_exists('civicrm_case_case_type_id', $row) &&
-        CRM_Utils_Array::value('civicrm_case_case_type_id', $rows[$rowNum])
-      ) {
-        $value   = $row['civicrm_case_case_type_id'];
-        $typeIds = explode(CRM_Core_DAO::VALUE_SEPARATOR, $value);
-        $value   = array();
-        foreach ($typeIds as $typeId) {
-          if ($typeId) {
-            $value[$typeId] = $this->case_types[$typeId];
-          }
-        }
-        $rows[$rowNum]['civicrm_case_case_type_id'] = implode(', ', $value);
-        $entryFound = TRUE;
       }
 
       // convert Case ID and Subject to links to Manage Case
@@ -387,14 +369,131 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
    * @access private
    */
   private function setHilConfigDefaults() {
-    $this->_hilCaseType = 'FinDienstverlening';
+    $this->_hilCaseType = 'Financien';
     $this->_hilCaseTypeId = $this->setHilCaseTypeId($this->_hilCaseType);
     $this->_hilExtraGegevensName = 'Extra_gegevens';
     $this->_hilExtraGegevensGroupId = $this->getCustomGroupId($this->_hilExtraGegevensName);
-    $this->_hilEconomischeStatusName = 'Economische_status';
-    $this->_hilEconomischeStatusGroupId = $this->getCustomGroupId($this->_hilEconomischeStatusName);
+    $this->_hilExtraGegevensTable = $this->getCustomTableName($this->_hilExtraGegevensGroupId);
+    $this->setHilExtraGegevensColumns();
     $this->_hilCheckInkomenName = 'Check_inkomensrechten';
     $this->_hilCheckInkomenGroupId = $this->getCustomGroupId($this->_hilCheckInkomenName);
+    $this->_hilCheckInkomenTable = $this->getCustomTableName($this->_hilCheckInkomenGroupId);
+    $this->setHilCheckInkomenColumns();
+    $this->setHilCaseStatusIds();
+    $this->_hilChangeStatusSubject = 'De dossierstatus is gewijzigd van Aangemeld naar Lopend.';
+    $this->setHilOpenCaseActivityTypeId();
+  }
+  private function setHilOpenCaseActivityTypeId() {
+    $optionGroupParams = array(
+      'name' => 'activity_type',
+      'return' => 'id');
+    try {
+      $activityTypeOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', $optionGroupParams);
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find an option group with name activity_type, '
+        . 'error from API OptionGroup GetValue: '.$ex->getMessage());
+    }
+    $optionValueParams = array(
+      'option_group_id' => $activityTypeOptionGroupId,
+      'name' => 'Open Case',
+      'return' => 'value');
+    try {
+      $this->_hilOpenCaseActivityTypeId = civicrm_api3('OptionValue', 'Getvalue', $optionValueParams);
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find an option value for activity_type Open Case, '
+        . 'error from API OptionValue GetValue: '.$ex->getMessage());      
+    }
+  }
+  /**
+   * Function to set case status ids for aangemeld and lopend
+   * 
+   * @throws Exception when no option group for case_status found
+   */
+  private function setHilCaseStatusIds() {
+    $optionGroupParams = array(
+      'name' => 'case_status',
+      'return' => 'id');
+    try {
+      $caseStatusOptionGroudId = civicrm_api3('OptionGroup', 'Getvalue', $optionGroupParams);
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find an option group with name case_status, '
+        . 'error from API OptionGroup GetValue: '.$ex->getMessage());
+    }
+    $optionValueParams = array('option_group_id' => $caseStatusOptionGroudId);
+    $optionValues = civicrm_api3('OptionValue', 'Get', $optionValueParams);
+    foreach ($optionValues['values'] as $optionValue) {
+      switch ($optionValue['name']) {
+        case 'Aangemeld':
+          $this->_hilAangemeldCaseStatusId = $optionValue['value'];
+          break;
+        case 'Lopend':
+          $this->_hilLopendCaseStatusId = $optionValue['value'];
+          break;
+      }
+    }
+  }
+  /**
+   * Function to get relevant column names from Extra Gegevens
+   */
+  private function setHilExtraGegevensColumns() {
+    $fields = civicrm_api3('CustomField', 'Get', array('custom_group_id' => $this->_hilExtraGegevensGroupId));
+    foreach ($fields['values'] as $field) {
+      switch($field['name']) {
+        case 'Burgerlijke_staat':
+          $this->_hilExtraGegevensColumns['burgerlijke_staat'] = $field['column_name'];
+          break;
+        case 'Land_van_herkomst':
+          $this->_hilExtraGegevensColumns['land_van_herkomst'] = $field['column_name'];
+          break;
+        case 'Economische_status2':
+          $this->_hilExtraGegevensColumns['economische_status'] = $field['column_name'];
+          break;
+      }
+    }
+  }
+  /**
+   * Function to get relevant column names from Check Inkomensrechten
+   */
+  private function setHilCheckInkomenColumns() {
+    $fields = civicrm_api3('CustomField', 'Get', array('custom_group_id' => $this->_hilCheckInkomenGroupId));
+    foreach ($fields['values'] as $field) {
+      switch($field['name']) {
+        case 'Soort_inkomensrechten_':
+          $this->_hilCheckInkomenColumns['soort_inkomen'] = $field['column_name'];
+          break;
+        case 'Status_Inkomensrechten_':
+          $this->_hilCheckInkomenColumns['status_inkomen'] = $field['column_name'];
+          break;
+        case 'Opbrengst_check_inkomen_':
+          $this->_hilCheckInkomenColumns['opbrengst_inkomen'] = $field['column_name'];
+          break;
+        case 'Opbrengst_check_belastingen_':
+          $this->_hilCheckInkomenColumns['opbrengst_belastingen'] = $field['column_name'];
+          break;
+        case 'Opbrengst_check_voorzieningen_':
+          $this->_hilCheckInkomenColumns['opbrengst_voorzieningen'] = $field['column_name'];
+          break;
+        case 'Opbrengst_Volledig_Check':
+          $this->_hilCheckInkomenColumns['opbrengst_volledig'] = $field['column_name'];
+          break;
+      }
+    }
+  }
+  /**
+   * Function to retrieve table_name for custom_group
+   * 
+   * @param int $customGroupId
+   * @return string $customTableName
+   */
+  private function getCustomTableName($customGroupId) {
+    $params = array('id' => $customGroupId, 'return' => 'table_name');
+    try {
+      $customTableName = civicrm_api3('CustomGroup', 'Getvalue', $params);
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not get table name for custom group '.$customGroupId.
+        ', error from API CustomGroup Getvalue: '.$ex->getMessage());
+    }
+    return $customTableName;
   }
   /**
    * Function to set custom group id for incoming name
@@ -440,7 +539,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       }
       $optionValueParams = [
         'option_group_id' => $caseTypeOptionGroupId, 
-        'label' => $caseTypeName, 
+        'name' => $caseTypeName, 
         'return' => 'value'];
       try {
         $caseTypeId = civicrm_api3('OptionValue', 'Getvalue', $optionValueParams);
@@ -450,6 +549,184 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       }      
     }
     return $caseTypeId;
+  }
+  /*
+   * Function to add column headers 
+   */
+  function modifyColumnHeaders() {
+    $this->_columnHeaders['leeftijd'] = array('title' => ts('Age'), 'type' => 2);
+    $this->_columnHeaders['burgerlijke_staat'] = array('title' => ts('Burg. Staat'), 'type' => 2);
+    $this->_columnHeaders['land_van_herkomst'] = array('title' => ts('Land van Herkomst'), 'type' => 2);
+    $this->_columnHeaders['economische_status'] = array('title' => ts('Economische Status'), 'type' => 2);
+    $this->_columnHeaders['soort_inkomen'] = array('title' => ts('Soort Inkomensrechten'), 'type' => 2);
+    $this->_columnHeaders['status_inkomen'] = array('title' => ts('Status Inkomensrechten'), 'type' => 2);
+    $this->_columnHeaders['opbrengst_inkomen'] = array('title' => ts('Opbrengst check inkomen'), 'type' => 2);
+    $this->_columnHeaders['opbrengst_belastingen'] = array('title' => ts('Opbrengst check belastingen'), 'type' => 2);
+    $this->_columnHeaders['opbrengst_voorzieningen'] = array('title' => ts('Opbrengst check voorzieningen'), 'type' => 2);
+    $this->_columnHeaders['opbrengst_volledig'] = array('title' => ts('Opbrengst check volledig'), 'type' => 2);
+    $this->_columnHeaders['wachttijd'] = array('title' => ts('Wachttijd'), 'type' => 2);
+  }
+  /**
+   * Function to enhance the rows selected with the specific Inter-Lokaal data
+   * 
+   * @param array $rows
+   */
+  private function hilEnhanceRows(&$rows) {
+    foreach ($rows as $rowNum => $row) {
+      $rows[$rowNum]['leeftijd'] = $this->getLeeftijd($row['civicrm_c2_id']);
+      $extraGegevens = $this->getExtraGegevens($row['civicrm_c2_id']);
+      $rows[$rowNum]['burgerlijke_staat'] = $extraGegevens['burgerlijke_staat'];
+      $rows[$rowNum]['land_van_herkomst'] = $extraGegevens['land_van_herkomst'];
+      $rows[$rowNum]['economische_status'] = $extraGegevens['economische_status'];
+      $checkInkomen = $this->getCheckInkomen($row['civicrm_case_id']);
+      $rows[$rowNum]['soort_inkomen'] = $checkInkomen['soort_inkomen'];
+      $rows[$rowNum]['status_inkomen'] = $checkInkomen['status_inkomen'];
+      $rows[$rowNum]['opbrengst_inkomen'] = $checkInkomen['opbrengst_inkomen'];
+      $rows[$rowNum]['opbrengst_belastingen'] = $checkInkomen['opbrengst_belastingen'];
+      $rows[$rowNum]['opbrengst_voorzieningen'] = $checkInkomen['opbrengst_voorzieningen'];
+      $rows[$rowNum]['opbrengst_volledig'] = $checkInkomen['opbrengst_volledig'];
+      $rows[$rowNum]['wachttijd'] = $this->calculateWachttijd($row['civicrm_case_id']);
+    }
+  }
+  /**
+   * Function to get the open case date time for a case
+   * 
+   * @param int $caseId
+   * @return date
+   */
+  private function getOpenCase($caseId) {
+    $query = 
+      'SELECT b.activity_date_time
+        FROM civicrm_case_activity a
+        JOIN civicrm_activity b ON a.activity_id = b.id
+        WHERE case_id = %1 AND b.is_current_revision = %2 
+        AND b.activity_type_id = %3';
+    $params = array(
+      1 => array($caseId, 'Positive'),
+      2 => array(1, 'Positive'),
+      3 => array($this->_hilOpenCaseActivityTypeId, 'Positive'));
+    $dao = CRM_Core_DAO::executeQuery($query, $params);
+    if ($dao->fetch()) {
+      if (!empty($dao->activity_date_time)) {
+        return $dao->activity_date_time;
+      } else {
+        return null;
+      }
+    }
+  }
+  /**
+   * Function to get the change case status from aangemeld to lopend date time for a case
+   * 
+   * @param int $caseId
+   * @return date
+   */
+  private function getChangeAangemeldToLopend($caseId) {
+    $query = 
+      'SELECT b.activity_date_time
+        FROM civicrm_case_activity a
+        JOIN civicrm_activity b ON a.activity_id = b.id
+        WHERE case_id = %1 AND b.is_current_revision = %2 
+        AND b.subject = %3';
+    $params = array(
+      1 => array($caseId, 'Positive'),
+      2 => array(1, 'Positive'),
+      3 => array($this->_hilChangeStatusSubject, 'String'));
+    $dao = CRM_Core_DAO::executeQuery($query, $params);
+    if ($dao->fetch()) {
+      if (!empty($dao->activity_date_time)) {
+        return $dao->activity_date_time;
+      } else {
+        return null;
+      }
+    }
+  }
+  /**
+   * Function to calculate time path between Open Case and Change Case Status from
+   * aangemeld to lopend
+   * 
+   * @param int $caseId
+   * @return int $wachttijd
+   */
+  private function calculateWachttijd($caseId) {
+    $openCaseDateTime = new DateTime($this->getOpenCase($caseId));
+    $changeCaseStatusDateTime = new DateTime($this->getChangeAangemeldToLopend($caseId));
+    $interval = $openCaseDateTime->diff($changeCaseStatusDateTime);
+    return $interval->days;
+  }
+  /**
+   * Function to get custom fields from Check Inkomen
+   * 
+   * @param int $entityId
+   * @return array $checkInkomen
+   */
+  private function getCheckInkomen($entityId) {
+    $checkInkomen = array();
+    $query = 'SELECT '.implode(', ', $this->_hilCheckInkomenColumns).' FROM '.
+      $this->_hilCheckInkomenTable.' WHERE entity_id = %1';
+    $params = array(1 => array($entityId, 'Positive'));
+    $dao = CRM_Core_DAO::executeQuery($query, $params);
+    if ($dao->fetch()) {
+      $checkInkomen['soort_inkomen'] = $dao->{$this->_hilCheckInkomenColumns['soort_inkomen']};
+      $checkInkomen['status_inkomen'] = $dao->{$this->_hilCheckInkomenColumns['status_inkomen']};
+      $checkInkomen['opbrengst_inkomen'] = CRM_Utils_Money::format($dao->{$this->_hilCheckInkomenColumns['opbrengst_inkomen']});
+      $checkInkomen['opbrengst_belastingen'] = CRM_Utils_Money::format($dao->{$this->_hilCheckInkomenColumns['opbrengst_belastingen']});
+      $checkInkomen['opbrengst_voorzieningen'] = CRM_Utils_Money::format($dao->{$this->_hilCheckInkomenColumns['opbrengst_voorzieningen']});
+      $checkInkomen['opbrengst_volledig'] = CRM_Utils_Money::format($dao->{$this->_hilCheckInkomenColumns['opbrengst_volledig']});
+    }
+    return $checkInkomen;
+  }
+  /**
+   * Function to get custom fields from Extra Gegevens
+   * 
+   * @param int $entityId
+   * @return array $extraGegevens
+   */
+  private function getExtraGegevens($entityId) {
+    $extraGegevens = array();
+    $query = 'SELECT '.implode(', ', $this->_hilExtraGegevensColumns).' FROM '.
+      $this->_hilExtraGegevensTable.' WHERE entity_id = %1';
+    $params = array(1 => array($entityId, 'Positive'));
+    $dao = CRM_Core_DAO::executeQuery($query, $params);
+    if ($dao->fetch()) {
+      $extraGegevens['burgerlijke_staat'] = $dao->{$this->_hilExtraGegevensColumns['burgerlijke_staat']};
+      $extraGegevens['land_van_herkomst'] = $this->getCountryName($dao->{$this->_hilExtraGegevensColumns['land_van_herkomst']});
+      $extraGegevens['economische_status'] = $dao->{$this->_hilExtraGegevensColumns['economische_status']};
+    }
+    return $extraGegevens;
+  }
+ /**
+   * Function to get the name of a country
+   * 
+   * @param int $countryId
+   * @return string $countryName
+   */
+  private function getCountryName($countryId) {
+    $params = array(
+      'id' => $countryId,
+      'return' => 'name');
+    try {
+      $countryName = civicrm_api3('Country', 'Getvalue', $params);
+    } catch (CiviCRM_API3_Exception $ex) {
+      $countryName = '';
+    }
+    return ts($countryName);
+  }
+  /**
+   * Function to calcute age
+   * @param type $contactId
+   * @return type
+   */
+  private function getLeeftijd($contactId) {
+    $params = array(
+      'id' => $contactId,
+      'return' => 'birth_date');
+    try {
+      $birthDate = civicrm_api3('Contact', 'Getvalue', $params);
+      $leeftijd = CRM_Utils_Date::calculateAge($birthDate);
+    } catch (CiviCRM_API3_Exception $ex) {
+      $leeftijd = NULL;
+    }
+    return $leeftijd['years'];
   }
 }
 
