@@ -63,7 +63,6 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
   function __construct() {
     $this->_add2groupSupported = FALSE;
     $this->setHilConfigDefaults();
-
     $this->case_statuses = CRM_Case_PseudoConstant::caseStatus();
     $rels                = CRM_Core_PseudoConstant::relationshipType();
     foreach ($rels as $relid => $v) {
@@ -380,7 +379,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     $this->_hilCheckInkomenTable = $this->getCustomTableName($this->_hilCheckInkomenGroupId);
     $this->setHilCheckInkomenColumns();
     $this->setHilCaseStatusIds();
-    $this->_hilChangeStatusSubject = 'De dossierstatus is gewijzigd van Aangemeld naar Lopend.';
+    $this->_hilChangeStatusSubject = 'De dossierstatus is gewijzigd van Aanmelding naar Lopend.';
     $this->setHilOpenCaseActivityTypeId();
   }
   private function setHilOpenCaseActivityTypeId() {
@@ -507,7 +506,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     if (empty($customGroupName)) {
       $customGroupId = 0;
     } else {
-      $customGroupParams = ['name' => $customGroupName, 'return' => 'id'];
+      $customGroupParams = array('name' => $customGroupName, 'return' => 'id');
       try {
         $customGroupId = civicrm_api3('CustomGroup', 'Getvalue', $customGroupParams);
       } catch (CiviCRM_API3_Exception $ex) {
@@ -530,17 +529,18 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     if (empty($caseTypeName)) {
       $caseTypeId = 0;
     } else {
-      $optionGroupParams = ['name' => 'case_type', 'return' => 'id'];
+      $optionGroupParams = array('name' => 'case_type', 'is_active' => 1, 'return' => 'id');
       try {
         $caseTypeOptionGroupId = civicrm_api3('OptionGroup', 'Getvalue', $optionGroupParams);
       } catch (CiviCRM_API3_Exception $ex) {
         throw new Exception('Could not find an option group with name case_type, '
           . 'error from API OptionGroup Getvalue : '.$ex->getMessage());
       }
-      $optionValueParams = [
+      $optionValueParams = array(
         'option_group_id' => $caseTypeOptionGroupId, 
-        'name' => $caseTypeName, 
-        'return' => 'value'];
+        'name' => $caseTypeName,
+        'is_active' => 1,
+        'return' => 'value');
       try {
         $caseTypeId = civicrm_api3('OptionValue', 'Getvalue', $optionValueParams);
       } catch (CiviCRM_API3_Exception $ex) {
@@ -621,6 +621,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
    * @return date
    */
   private function getChangeAangemeldToLopend($caseId) {
+    $retrievedDate = null;
     $query = 
       'SELECT b.activity_date_time
         FROM civicrm_case_activity a
@@ -634,11 +635,12 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     $dao = CRM_Core_DAO::executeQuery($query, $params);
     if ($dao->fetch()) {
       if (!empty($dao->activity_date_time)) {
-        return $dao->activity_date_time;
+        $retrievedDate = $dao->activity_date_time;
       } else {
-        return null;
+        $retrievedDate = null;
       }
     }
+    return $retrievedDate;
   }
   /**
    * Function to calculate time path between Open Case and Change Case Status from
@@ -648,10 +650,20 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
    * @return int $wachttijd
    */
   private function calculateWachttijd($caseId) {
-    $openCaseDateTime = new DateTime($this->getOpenCase($caseId));
-    $changeCaseStatusDateTime = new DateTime($this->getChangeAangemeldToLopend($caseId));
-    $interval = $openCaseDateTime->diff($changeCaseStatusDateTime);
-    return $interval->days;
+    $wachtTijd = '';
+    $openCaseDateTime = $this->getOpenCase($caseId);
+    if (!empty($openCaseDateTime)) {
+      $openDate = new DateTime($openCaseDateTime);
+      $changeCaseStatusDateTime = $this->getChangeAangemeldToLopend($caseId);
+      if (!empty($changeCaseStatusDateTime)) {
+        $changeDate = new DateTime($changeCaseStatusDateTime);
+        $interval = $openDate->diff($changeDate);
+        $wachtTijd = (string) $interval->days;
+      } else {
+        $wachtTijd = '';
+      }
+    return $wachtTijd;
+    }
   }
   /**
    * Function to get custom fields from Check Inkomen
@@ -722,7 +734,11 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       'return' => 'birth_date');
     try {
       $birthDate = civicrm_api3('Contact', 'Getvalue', $params);
-      $leeftijd = CRM_Utils_Date::calculateAge($birthDate);
+      if (!empty($birthDate)) {
+        $leeftijd = CRM_Utils_Date::calculateAge($birthDate);
+      } else {
+        $leeftijd = NULL;
+      }
     } catch (CiviCRM_API3_Exception $ex) {
       $leeftijd = NULL;
     }
