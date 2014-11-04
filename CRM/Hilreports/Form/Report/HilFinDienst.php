@@ -61,6 +61,7 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
   protected $_hilChangeStatusSubject = NULL;
 
   function __construct() {
+    $this->_limit = 50;
     $this->_add2groupSupported = FALSE;
     $this->setHilConfigDefaults();
     $this->case_statuses = CRM_Case_PseudoConstant::caseStatus();
@@ -309,10 +310,10 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     $rows = $graphRows = array();
     
     $this->buildRows($sql, $rows);
+    $this->formatDisplay($rows);
     
     $this->hilEnhanceRows($rows);
 
-    $this->formatDisplay($rows);
     $this->doTemplateAssignment($rows);
     $this->endPostProcess($rows);
   }
