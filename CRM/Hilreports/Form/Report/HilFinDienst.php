@@ -320,6 +320,10 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
   function alterDisplay(&$rows) {
     $entryFound = FALSE;
     foreach ($rows as $rowNum => $row) {
+      if (array_key_exists('civicrm_c2_gender_id', $row)) {
+        $rows[$rowNum]['civicrm_c2_gender_id'] = $this->getGender($row['civicrm_c2_gender_id']);
+      }
+      
       if (array_key_exists('civicrm_case_status_id', $row)) {
         if ($value = $row['civicrm_case_status_id']) {
           $rows[$rowNum]['civicrm_case_status_id'] = $this->case_statuses[$value];
@@ -743,6 +747,25 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       $leeftijd = NULL;
     }
     return $leeftijd['years'];
+  }
+  private function getGender($genderId) {
+    $groupParams = array('name' => 'gender', 'return' => 'id');
+    try {
+      $genderGroupId = civicrm_api3('OptionGroup', 'Getvalue', $groupParams);
+    } catch (CiviCRM_API3_Exception $ex) {
+      throw new Exception('Could not find an option group with name gender, error '
+        . 'from API OptionGroup Getvalue: '.$ex->getMessage());
+    }
+    $valueParams = array(
+      'option_group_id' => $genderGroupId, 
+      'value' => $genderId, 
+      'return' => 'label');
+    try {
+      $genderLabel = civicrm_api3('OptionValue', 'Getvalue', $valueParams);
+    } catch (CiviCRM_API3_Exception $ex) {
+      $genderLabel = '';
+    }
+    return $genderLabel;
   }
 }
 
