@@ -59,6 +59,7 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
   protected $_hilLopendCaseStatusId = NULL;
   protected $_hilOpenCaseActivityTypeId = NULL;
   protected $_hilChangeStatusSubject = NULL;
+  protected $_dossierManagerRelationId = 0;
 
   function __construct() {
     $this->_limit = 50;
@@ -67,7 +68,9 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
     $this->case_statuses = CRM_Case_PseudoConstant::caseStatus();
     $rels                = CRM_Core_PseudoConstant::relationshipType();
     foreach ($rels as $relid => $v) {
-      $this->rel_types[$relid] = $v['label_b_a'];
+      if ($v['label_b_a'] == 'Dossiermanager') {
+        $this->_dossierManagerRelationId = $relid;
+      }
     }
 
     $this->deleted_labels = array('' => ts('- select -'), 0 => ts('No'), 1 => ts('Yes'));
@@ -163,6 +166,7 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
         'filters' =>
         array('relationship_type_id' => array('title' => ts('Staff Relationship'),
             'operatorType' => CRM_Report_Form::OP_MULTISELECT,
+            'no_display' => TRUE,
             'options' => $this->rel_types,
           ),
         ),
@@ -229,13 +233,12 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
     $cr  = $this->_aliases['civicrm_relationship'];
     $crt = $this->_aliases['civicrm_relationship_type'];
     $ccc = $this->_aliases['civicrm_case_contact'];
-
     if ($this->_relField) {
       $this->_from = "
             FROM civicrm_contact $c 
 inner join civicrm_relationship $cr on {$c}.id = ${cr}.contact_id_b
 inner join civicrm_case $cc on ${cc}.id = ${cr}.case_id
-inner join civicrm_relationship_type $crt on ${crt}.id=${cr}.relationship_type_id
+inner join civicrm_relationship_type $crt on ${crt}.id=${cr}.relationship_type_id AND ${crt}.id=$this->_dossierManagerRelationId
 inner join civicrm_case_contact $ccc on ${ccc}.case_id = ${cc}.id
 inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
 ";
@@ -308,7 +311,6 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     $sql = $this->buildQuery(TRUE);
 
     $rows = $graphRows = array();
-    
     $this->buildRows($sql, $rows);
     $this->formatDisplay($rows);
     
