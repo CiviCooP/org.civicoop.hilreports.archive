@@ -167,7 +167,7 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
         array('relationship_type_id' => array('title' => ts('Staff Relationship'),
             'operatorType' => CRM_Report_Form::OP_MULTISELECT,
             'no_display' => TRUE,
-            'options' => $this->rel_types,
+            'options' => array(),
           ),
         ),
       ),
@@ -582,17 +582,21 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     foreach ($rows as $rowNum => $row) {
       $rows[$rowNum]['leeftijd'] = $this->getLeeftijd($row['civicrm_c2_id']);
       $extraGegevens = $this->getExtraGegevens($row['civicrm_c2_id']);
-      $rows[$rowNum]['burgerlijke_staat'] = $extraGegevens['burgerlijke_staat'];
-      $rows[$rowNum]['land_van_herkomst'] = $extraGegevens['land_van_herkomst'];
-      $rows[$rowNum]['economische_status'] = $extraGegevens['economische_status'];
+      if (!empty($extraGegevens)) {
+        $rows[$rowNum]['burgerlijke_staat'] = $extraGegevens['burgerlijke_staat'];
+        $rows[$rowNum]['land_van_herkomst'] = $extraGegevens['land_van_herkomst'];
+        $rows[$rowNum]['economische_status'] = $extraGegevens['economische_status'];
+      }
       $checkInkomen = $this->getCheckInkomen($row['civicrm_case_id']);
-      $rows[$rowNum]['soort_inkomen'] = $checkInkomen['soort_inkomen'];
-      $rows[$rowNum]['status_inkomen'] = $checkInkomen['status_inkomen'];
-      $rows[$rowNum]['opbrengst_inkomen'] = $checkInkomen['opbrengst_inkomen'];
-      $rows[$rowNum]['opbrengst_belastingen'] = $checkInkomen['opbrengst_belastingen'];
-      $rows[$rowNum]['opbrengst_voorzieningen'] = $checkInkomen['opbrengst_voorzieningen'];
-      $rows[$rowNum]['opbrengst_volledig'] = $checkInkomen['opbrengst_volledig'];
-      $rows[$rowNum]['wachttijd'] = $this->calculateWachttijd($row['civicrm_case_id']);
+      if (!empty($checkInkomen)) {
+        $rows[$rowNum]['soort_inkomen'] = $checkInkomen['soort_inkomen'];
+        $rows[$rowNum]['status_inkomen'] = $checkInkomen['status_inkomen'];
+        $rows[$rowNum]['opbrengst_inkomen'] = $checkInkomen['opbrengst_inkomen'];
+        $rows[$rowNum]['opbrengst_belastingen'] = $checkInkomen['opbrengst_belastingen'];
+        $rows[$rowNum]['opbrengst_voorzieningen'] = $checkInkomen['opbrengst_voorzieningen'];
+        $rows[$rowNum]['opbrengst_volledig'] = $checkInkomen['opbrengst_volledig'];
+        $rows[$rowNum]['wachttijd'] = $this->calculateWachttijd($row['civicrm_case_id']);
+      }
     }
   }
   /**
