@@ -286,16 +286,15 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
               );
             }
           }
-
           if (!empty($clause)) {
             $clauses[] = $clause;
-            $clauses[] = "(case_civireport.case_type_id LIKE CONCAT ('%".
-              CRM_Core_DAO::VALUE_SEPARATOR."',".$this->_hilCaseTypeId.",'".
-              CRM_Core_DAO::VALUE_SEPARATOR ."%'))";
           }
         }
       }
     }
+    $clauses[] = "(case_civireport.case_type_id LIKE CONCAT ('%".
+      CRM_Core_DAO::VALUE_SEPARATOR."',".$this->_hilCaseTypeId.",'".
+      CRM_Core_DAO::VALUE_SEPARATOR ."%'))";
 
     if (empty($clauses)) {
       $this->_where = "WHERE ( 1 ) ";
@@ -577,6 +576,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
    * Function to add column headers 
    */
   function modifyColumnHeaders() {
+    $this->_columnHeaders['kenmerk'] = array('title' => ts('Tag'), 'type' => 2);
     $this->_columnHeaders['leeftijd'] = array('title' => ts('Age'), 'type' => 2);
     $this->_columnHeaders['burgerlijke_staat'] = array('title' => ts('Burg. Staat'), 'type' => 2);
     $this->_columnHeaders['land_van_herkomst'] = array('title' => ts('Land van Herkomst'), 'type' => 2);
@@ -597,6 +597,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
    */
   private function hilEnhanceRows(&$rows) {
     foreach ($rows as $rowNum => $row) {
+      $rows[$rowNum]['kenmerk'] = $this->getCaseTag($row['civicrm_case_id']);
       $rows[$rowNum]['leeftijd'] = $this->getLeeftijd($row['civicrm_c2_id']);
       $extraGegevens = $this->getExtraGegevens($row['civicrm_c2_id']);
       if (!empty($extraGegevens)) {
@@ -615,6 +616,37 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
         $rows[$rowNum]['wachttijd'] = $this->calculateWachttijd($row['civicrm_case_id']);
       }
     }
+  }
+
+  /**
+   * Function to get the tags for the case
+   *
+   * @param $caseId
+   * @return string
+   */
+
+  private function getCaseTag($caseId) {
+    $tagStrings = array();
+    $entityTagParams = array(
+      'entity_table' => 'civicrm_case',
+      'entity_id' => $caseId);
+    try {
+      $apiCaseTags = civicrm_api3('EntityTag', 'Get', $entityTagParams);
+      foreach ($apiCaseTags['values'] as $apiCaseTag) {
+        $tagParams = array(
+          'id' => $apiCaseTag['tag_id'],
+          'return' => 'name');
+        try {
+          $tagStrings[] = civicrm_api3('Tag', 'Getvalue', $tagParams);
+        } catch (CiviCRM_API3_Exception $ex) {
+
+        }
+      }
+      asort($tagStrings);
+    } catch (CiviCRM_API3_Exception $ex) {
+
+    }
+    return implode('; ', $tagStrings);
   }
 
   /**
@@ -805,6 +837,30 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       $genderLabel = '';
     }
     return $genderLabel;
+  }
+
+  /**
+   * Override of core function to use civicrm_case rather than civicrm_contact
+   *
+   * @param $field
+   * @param $value
+   * @param $op
+   * @return string
+   */
+  function whereTagClause($field, $value, $op) {
+    // not using left join in query because if any contact
+    // belongs to more than one tag, results duplicate
+    // entries.
+    $sqlOp = self::getSQLOperator($op);
+    if (!is_array($value)) {
+      $value = array($value);
+    }
+    $clause = "{$field['dbAlias']} IN (" . implode(', ', $value) . ")";
+
+    return " {$this->_aliases['civicrm_case']}.id {$sqlOp} (
+                          SELECT DISTINCT {$this->_aliases['civicrm_tag']}.entity_id
+                          FROM civicrm_entity_tag {$this->_aliases['civicrm_tag']}
+                          WHERE entity_table = 'civicrm_case' AND {$clause} ) ";
   }
 }
 
