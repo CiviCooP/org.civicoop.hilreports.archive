@@ -38,7 +38,7 @@
  * $Id$
  *
  */
-class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
+class CRM_Hilreports_Form_Report_HilNwAanmelding extends CRM_Report_Form {
 
   protected $_summary = NULL;
   protected $_relField = FALSE;
@@ -125,7 +125,12 @@ class CRM_Hilreports_Form_Report_HilFinDienst extends CRM_Report_Form {
           ),
         ),
         'filters' =>
-        array('start_date' => array('title' => ts('Start Date'),
+        array(
+          'subject' => array('title' => ts('Subject'),
+            'operatorType' => CRM_Report_Form::OP_STRING,
+            'type' => CRM_Utils_Type::T_STRING
+          ),
+          'start_date' => array('title' => ts('Start Date'),
             'operatorType' => CRM_Report_Form::OP_DATE,
             'type' => CRM_Utils_Type::T_DATE,
           ),
@@ -369,12 +374,14 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       }
     }
   }
+
   /**
    * Function to set default config options for Het Inter-lokaal
    * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
    * @access private
    */
   private function setHilConfigDefaults() {
+    $this->_tagFilter = TRUE;
     $this->_hilCaseType = 'Financien';
     $this->_hilCaseTypeId = $this->setHilCaseTypeId($this->_hilCaseType);
     $this->_hilExtraGegevensName = 'Extra_gegevens';
@@ -389,6 +396,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     $this->_hilChangeStatusSubject = 'De dossierstatus is gewijzigd van Aanmelding naar Lopend.';
     $this->setHilOpenCaseActivityTypeId();
   }
+
   private function setHilOpenCaseActivityTypeId() {
     $optionGroupParams = array(
       'name' => 'activity_type',
@@ -410,6 +418,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
         . 'error from API OptionValue GetValue: '.$ex->getMessage());      
     }
   }
+
   /**
    * Function to set case status ids for aangemeld and lopend
    * 
@@ -438,6 +447,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       }
     }
   }
+
   /**
    * Function to get relevant column names from Extra Gegevens
    */
@@ -457,6 +467,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       }
     }
   }
+
   /**
    * Function to get relevant column names from Check Inkomensrechten
    */
@@ -485,10 +496,12 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       }
     }
   }
+
   /**
    * Function to retrieve table_name for custom_group
    * 
    * @param int $customGroupId
+   * @throws Exception when error from api
    * @return string $customTableName
    */
   private function getCustomTableName($customGroupId) {
@@ -501,6 +514,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     }
     return $customTableName;
   }
+
   /**
    * Function to set custom group id for incoming name
    * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
@@ -523,6 +537,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     }
     return $customGroupId;
   }
+
   /**
    * Function to set case type id for incoming name
    * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
@@ -557,6 +572,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     }
     return $caseTypeId;
   }
+
   /*
    * Function to add column headers 
    */
@@ -573,6 +589,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     $this->_columnHeaders['opbrengst_volledig'] = array('title' => ts('Opbrengst check volledig'), 'type' => 2);
     $this->_columnHeaders['wachttijd'] = array('title' => ts('Wachttijd'), 'type' => 2);
   }
+
   /**
    * Function to enhance the rows selected with the specific Inter-Lokaal data
    * 
@@ -599,6 +616,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       }
     }
   }
+
   /**
    * Function to get the open case date time for a case
    * 
@@ -625,6 +643,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
       }
     }
   }
+
   /**
    * Function to get the change case status from aangemeld to lopend date time for a case
    * 
@@ -653,6 +672,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     }
     return $retrievedDate;
   }
+
   /**
    * Function to calculate time path between Open Case and Change Case Status from
    * aangemeld to lopend
@@ -676,6 +696,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     return $wachtTijd;
     }
   }
+
   /**
    * Function to get custom fields from Check Inkomen
    * 
@@ -698,6 +719,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     }
     return $checkInkomen;
   }
+
   /**
    * Function to get custom fields from Extra Gegevens
    * 
@@ -717,6 +739,7 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     }
     return $extraGegevens;
   }
+
  /**
    * Function to get the name of a country
    * 
@@ -734,10 +757,11 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     }
     return ts($countryName);
   }
+
   /**
    * Function to calcute age
-   * @param type $contactId
-   * @return type
+   * @param int $contactId
+   * @return int
    */
   private function getLeeftijd($contactId) {
     $params = array(
@@ -755,6 +779,14 @@ inner join civicrm_contact $c2 on ${c2}.id=${ccc}.contact_id
     }
     return $leeftijd['years'];
   }
+
+  /**
+   * Function to get gender label
+   *
+   * @param int $genderId
+   * @return string $genderLabel
+   * @throws Exception when error in API
+   */
   private function getGender($genderId) {
     $groupParams = array('name' => 'gender', 'return' => 'id');
     try {
